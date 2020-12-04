@@ -72,7 +72,7 @@ func (c *CordonHelper) UpdateIfRequired(desired bool) bool {
 // updating the given node object; it may return error if the object cannot be encoded as
 // JSON, or if either patch or update calls fail; it will also return a second error
 // whenever creating a patch has failed
-func (c *CordonHelper) PatchOrReplace(clientset kubernetes.Interface, serverDryRun bool) (error, error) {
+func (c *CordonHelper) PatchOrReplace(clientCtx context.Context, clientset kubernetes.Interface, serverDryRun bool) (error, error) {
 	client := clientset.CoreV1().Nodes()
 
 	oldData, err := json.Marshal(c.node)
@@ -87,19 +87,25 @@ func (c *CordonHelper) PatchOrReplace(clientset kubernetes.Interface, serverDryR
 		return err, nil
 	}
 
+	// defensive coding against nil contexts
+	// TODO(srm09): maybe find a better way to deal with this scenario
+	if clientCtx == nil {
+		clientCtx = context.TODO()
+	}
+
 	patchBytes, patchErr := strategicpatch.CreateTwoWayMergePatch(oldData, newData, c.node)
 	if patchErr == nil {
 		patchOptions := metav1.PatchOptions{}
 		if serverDryRun {
 			patchOptions.DryRun = []string{metav1.DryRunAll}
 		}
-		_, err = client.Patch(context.TODO(), c.node.Name, types.StrategicMergePatchType, patchBytes, patchOptions)
+		_, err = client.Patch(clientCtx, c.node.Name, types.StrategicMergePatchType, patchBytes, patchOptions)
 	} else {
 		updateOptions := metav1.UpdateOptions{}
 		if serverDryRun {
 			updateOptions.DryRun = []string{metav1.DryRunAll}
 		}
-		_, err = client.Update(context.TODO(), c.node, updateOptions)
+		_, err = client.Update(clientCtx, c.node, updateOptions)
 	}
 	return err, patchErr
 }

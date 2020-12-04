@@ -17,6 +17,7 @@ limitations under the License.
 package drain
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -148,9 +149,16 @@ func NewDrainCmdOptions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams
 			GracePeriodSeconds: -1,
 			Out:                ioStreams.Out,
 			ErrOut:             ioStreams.ErrOut,
+			Ctx:                context.Background(),
 		},
 	}
 	o.drainer.OnPodDeletedOrEvicted = o.onPodDeletedOrEvicted
+	return o
+}
+
+// WithHelperContext populates the drainer object with a supplied context
+func (o *DrainCmdOptions) WithHelperContext(ctx context.Context) *DrainCmdOptions {
+	o.drainer.Ctx = ctx
 	return o
 }
 
@@ -400,7 +408,7 @@ func (o *DrainCmdOptions) RunCordonOrUncordon(desired bool) error {
 							continue
 						}
 					}
-					err, patchErr := c.PatchOrReplace(o.drainer.Client, o.drainer.DryRunStrategy == cmdutil.DryRunServer)
+					err, patchErr := c.PatchOrReplace(o.drainer.Ctx, o.drainer.Client, o.drainer.DryRunStrategy == cmdutil.DryRunServer)
 					if patchErr != nil {
 						printError(patchErr)
 					}
